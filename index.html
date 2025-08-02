@@ -1,0 +1,171 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Threat Monitoring Dashboard</title>
+    <!-- Use Tailwind CSS for a modern, responsive design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 p-8">
+
+    <!-- Header -->
+    <header class="text-center mb-12">
+        <h1 class="text-4xl md:text-5xl font-bold tracking-tight text-white">Threat Monitoring Dashboard</h1>
+        <p class="text-lg text-gray-400 mt-2">Real-time analysis of network security events.</p>
+    </header>
+
+    <!-- Dashboard Cards Section -->
+    <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <!-- Card: Total Events -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700 hover:border-blue-500 transition-colors duration-300">
+            <h2 class="text-lg font-semibold text-gray-300">Total Events</h2>
+            <p id="total-events" class="text-4xl font-bold mt-2 text-white">0</p>
+        </div>
+        <!-- Card: Malicious Events -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700 hover:border-red-500 transition-colors duration-300">
+            <h2 class="text-lg font-semibold text-gray-300">Malicious Events</h2>
+            <p id="malicious-events" class="text-4xl font-bold mt-2 text-red-500">0</p>
+        </div>
+        <!-- Card: Threat Percentage -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700 hover:border-yellow-500 transition-colors duration-300">
+            <h2 class="text-lg font-semibold text-gray-300">Threat Percentage</h2>
+            <p id="threat-percentage" class="text-4xl font-bold mt-2 text-yellow-500">0.00%</p>
+        </div>
+        <!-- Card: Status -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700 hover:border-green-500 transition-colors duration-300">
+            <h2 class="text-lg font-semibold text-gray-300">Status</h2>
+            <p class="text-4xl font-bold mt-2 text-green-500">Active</p>
+        </div>
+    </section>
+
+    <!-- Charts Section -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Chart: Protocol Distribution -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700">
+            <h2 class="text-xl font-semibold text-gray-300 mb-4">Protocol Distribution</h2>
+            <canvas id="protocolChart"></canvas>
+        </div>
+        <!-- Chart: Top Malicious IPs -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700">
+            <h2 class="text-xl font-semibold text-gray-300 mb-4">Top Malicious Destination IPs</h2>
+            <canvas id="maliciousIpChart"></canvas>
+        </div>
+    </section>
+
+    <!-- Chart.js Library for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <!-- Dashboard Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize Chart.js charts
+            let protocolChart = null;
+            let maliciousIpChart = null;
+
+            // Chart configuration for a dark theme
+            const chartConfig = (type, labels, data) => ({
+                type: type,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Count',
+                        data: data,
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.6)',  // blue-500
+                            'rgba(239, 68, 68, 0.6)',  // red-500
+                            'rgba(245, 158, 11, 0.6)', // yellow-500
+                            'rgba(16, 185, 129, 0.6)'  // green-500
+                        ],
+                        borderColor: [
+                            'rgb(59, 130, 246)',
+                            'rgb(239, 68, 68)',
+                            'rgb(245, 158, 11)',
+                            'rgb(16, 185, 129)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#d1d5db' // gray-300
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#d1d5db'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#d1d5db'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Function to fetch data from the Flask API and update the dashboard
+            const fetchDataAndUpdate = async () => {
+                try {
+                    // Use a relative URL here since the frontend and backend are served from the same host.
+                    const response = await fetch('/api/data'); 
+                    const data = await response.json();
+
+                    // Update dashboard cards with the latest metrics
+                    document.getElementById('total-events').innerText = data.total_events.toLocaleString();
+                    document.getElementById('malicious-events').innerText = data.malicious_events_count.toLocaleString();
+                    document.getElementById('threat-percentage').innerText = `${data.threat_percentage.toFixed(2)}%`;
+
+                    // Update Protocol Distribution Chart
+                    const protocolCtx = document.getElementById('protocolChart').getContext('2d');
+                    if (protocolChart) {
+                        protocolChart.data.labels = data.protocol_distribution.labels;
+                        protocolChart.data.datasets[0].data = data.protocol_distribution.data;
+                        protocolChart.update();
+                    } else {
+                        protocolChart = new Chart(protocolCtx, chartConfig('pie', data.protocol_distribution.labels, data.protocol_distribution.data));
+                    }
+                    
+                    // Update Top Malicious IPs Chart
+                    const maliciousIpCtx = document.getElementById('maliciousIpChart').getContext('2d');
+                    if (maliciousIpChart) {
+                        maliciousIpChart.data.labels = data.top_malicious_ips.labels;
+                        maliciousIpChart.data.datasets[0].data = data.top_malicious_ips.data;
+                        maliciousIpChart.update();
+                    } else {
+                        maliciousIpChart = new Chart(maliciousIpCtx, chartConfig('bar', data.top_malicious_ips.labels, data.top_malicious_ips.data));
+                    }
+
+                } catch (error) {
+                    console.error('Error fetching data:', error);
+                }
+            };
+
+            // Fetch data initially and then every 3 seconds for a real-time effect
+            fetchDataAndUpdate();
+            setInterval(fetchDataAndUpdate, 3000);
+        });
+    </script>
+</body>
+</html>
